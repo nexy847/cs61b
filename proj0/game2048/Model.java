@@ -1,6 +1,7 @@
 package game2048;
 
 import java.util.Formatter;
+import java.util.Objects;
 import java.util.Observable;
 
 
@@ -114,6 +115,571 @@ public class Model extends Observable {
         // for the tilt to the Side SIDE. If the board changed, set the
         // changed local variable to true.
 
+        if(side==Side.NORTH){
+        int [][] num=new int[board.size()][board.size()];
+        for (int i = 0; i < num.length; i++) {
+            for (int j = 0; j < num[i].length; j++) {
+                num[i][j] = 0;
+            }
+        }
+        for(int c=0;c<board.size();c+=1){
+            for(int r=0;r< board.size();r+=1){
+                Tile t=board.tile(c,r);
+                if(t!=null){
+                    if(side==Side.NORTH){
+                        int count=0;
+                        for(int i=t.row()+1;i<4;i++){
+                            Tile tN=board.tile(t.col(),i);
+                            if(tN!=null&&tN.value()==t.value()){
+                                count++;
+                            }
+                        }
+                        if(count==0){
+                            //move到运动方向上碰到的第一个节点的后一格
+                            for(int i=t.row()+1;i<4;i++){
+                                Tile ft=board.tile(t.col(),i);
+                                if(ft!=null){
+                                    boolean merge=board.move(t.col(),i-1,t);
+                                    if(merge){
+                                        score+=4;
+                                        num[t.col()][i-1]=1;
+                                    }
+                                    changed=true;
+                                    break;
+                                }else{
+                                    changed=false;
+                                }
+                            }
+                            if(changed==false){
+                                    boolean merge = board.move(t.col(), 3, t);
+                                    if (merge) {
+                                        score += 4;
+                                        num[t.col()][3] = 1;
+                                    }
+                                    changed=true;
+                            }
+                        }else if(count%2==0&&count!=0){
+                            for(int i=t.row()+1;i<4;i++){
+                                Tile ft=board.tile(t.col(),i);
+                                if(ft!=null) {
+                                    if(num[t.col()][t.row()]==0){
+                                    if (ft.value() == t.value()) {
+                                        int col = ft.col();
+                                        int row = ft.row();
+                                        for (int j = row + 1; j < 4; j++) {
+                                            Tile fT = board.tile(col, j);
+                                            if (fT != null) {
+                                                if (ft.value() == fT.value()) {
+                                                    if(num[ft.col()][ft.row()]==0) {
+                                                        boolean merge = board.move(col, fT.row(), ft);
+                                                        if (merge) {
+                                                            score += 4;
+                                                            num[ft.col()][fT.row()] = 1;
+                                                        }
+                                                        changed = true;
+                                                    }
+                                                } else {
+                                                    if(num[ft.col()][ft.row()]==0) {
+                                                        boolean merge = board.move(col, fT.row(), ft);
+                                                        changed=true;
+                                                        if (merge) {
+                                                            score += 4;
+                                                            num[ft.col()][fT.row()] = 1;
+                                                        }
+                                                    }
+                                                }
+                                                break;
+                                            }
+                                        }
+                                        boolean merge = board.move(col, row, t);
+                                        if (merge) {
+                                            score += 4;
+                                            num[col][row] = 1;
+                                        }
+                                        changed = true;}
+                                    }else {
+                                        if (num[t.col()][t.row()] == 0) {
+                                            boolean merge = board.move(ft.col(), ft.row() - 1, t);
+                                            if (merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                            changed = true;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }else if(count%2!=0){
+                            for(int i=t.row()+1;i<4;i++){
+                                Tile ft=board.tile(t.col(),i);
+                                if(ft!=null){
+                                    if(ft.value()==t.value()){
+                                        if(num[t.col()][t.row()]==0) {
+                                            boolean merge = board.move(ft.col(), ft.row(), t);
+                                            changed=true;
+                                            if (merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                        }
+                                    }else {
+                                        if(num[t.col()][t.row()]==0) {
+                                            boolean merge = board.move(ft.col(), ft.row() - 1, t);
+                                            changed=true;
+                                            if(merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        if(r==3){
+                            for(int i= 3;i>=0;i--){
+                                Tile tb=board.tile(c,i);
+                                if(tb!=null){
+                                    for(int j=tb.row()+1;j<4;j++){
+                                        Tile tf=board.tile(c,j);
+                                        if(tf!=null){
+                                            boolean merge=board.move(c,tf.row()-1,tb);
+                                            changed=true;
+                                            if(merge){
+                                                score+=4;
+                                                num[c][tf.row()]=1;
+                                            }
+                                        }else{
+                                            board.move(c,j,tb);
+                                            changed=true;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }}
+
+        if(side==Side.SOUTH){
+            int [][] num=new int[board.size()][board.size()];
+            for (int i = 0; i < num.length; i++) {
+                for (int j = 0; j < num[i].length; j++) {
+                    num[i][j] = 0;
+                }
+            }
+            for(int c= 3;c>=0;c--){
+                for(int r=3;r>=0;r--){
+                    Tile t=board.tile(c,r);
+                    if(t!=null){
+                        int count=0;
+                        for(int i=t.row()-1;i>=0;i--){
+                            Tile tN=board.tile(t.col(),i);
+                            if(tN!=null&&tN.value()==t.value()){
+                                count++;
+                            }
+                        }
+
+                        if(count==0){
+                            for(int i=t.row()-1;i>=0;i--){
+                                Tile ft=board.tile(t.col(),i);
+                                if(ft!=null){
+                                    board.move(t.col(),i+1,t);
+                                    changed=true;
+                                    break;
+                                }else changed=false;
+                            }
+                            if(changed==false){
+                                board.move(t.col(),0,t);
+                                changed=true;
+                            }
+                        }else if(count%2==0&&count!=0){
+                            for(int i=t.row()-1;i>=0;i--){
+                                Tile ft=board.tile(t.col(),i);
+                                if(ft!=null) {
+                                    if(num[t.col()][t.row()]==0){
+                                        if (ft.value() == t.value()) {
+                                            int col = ft.col();
+                                            int row = ft.row();
+                                            for (int j = row - 1; j >= 0; j--) {
+                                                Tile fT = board.tile(col, j);
+                                                if (fT != null) {
+                                                    if (ft.value() == fT.value()) {
+                                                        if(num[ft.col()][ft.row()]==0) {
+                                                            boolean merge = board.move(col, fT.row(), ft);
+                                                            if (merge) {
+                                                                score += 4;
+                                                                num[ft.col()][fT.row()] = 1;
+                                                            }
+                                                            changed = true;
+                                                        }
+                                                    } else {
+                                                        if(num[ft.col()][ft.row()]==0) {
+                                                            boolean merge = board.move(col, fT.row(), ft);
+                                                            changed=true;
+                                                            if (merge) {
+                                                                score += 4;
+                                                                num[ft.col()][fT.row()] = 1;
+                                                            }
+                                                        }
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                            boolean merge = board.move(col, row, t);
+                                            if (merge) {
+                                                score += 4;
+                                                num[col][row] = 1;
+                                            }
+                                            changed = true;}
+                                    }else {
+                                        if (num[t.col()][t.row()] == 0) {
+                                            boolean merge = board.move(ft.col(), ft.row() + 1, t);
+                                            if (merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                            changed = true;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }else if(count%2!=0){
+                            for(int i=t.row()-1;i>=0;i--){
+                                Tile ft=board.tile(t.col(),i);
+                                if(ft!=null){
+                                    if(ft.value()==t.value()){
+                                        if(num[t.col()][t.row()]==0) {
+                                            boolean merge = board.move(ft.col(), ft.row(), t);
+                                            changed=true;
+                                            if (merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                        }
+                                    }else {
+                                        if(num[t.col()][t.row()]==0) {
+                                            boolean merge = board.move(ft.col(), ft.row() + 1, t);
+                                            changed=true;
+                                            if(merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        if(r==0){
+                            for(int i= 0;i<4;i++){
+                                Tile tb=board.tile(c,i);
+                                if(tb!=null){
+                                    for(int j=tb.row()-1;j>=0;j--){
+                                        Tile tf=board.tile(c,j);
+                                        if(tf!=null){
+                                            boolean merge=board.move(c,tf.row()+1,tb);
+                                            changed=true;
+                                            if(merge){
+                                                score+=4;
+                                                num[c][tf.row()]=1;
+                                            }
+                                        }else{
+                                            board.move(c,j,tb);
+                                            changed=true;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if(side==Side.EAST){
+            int [][] num=new int[board.size()][board.size()];
+            for (int i = 0; i < num.length; i++) {
+                for (int j = 0; j < num[i].length; j++) {
+                    num[i][j] = 0;
+                }
+            }
+
+            for(int r=0;r< board.size();r++){
+                for(int c=0;c< board.size();c++){
+                    Tile t=board.tile(c,r);
+                    if(t!=null){
+                        int count=0;
+                        for(int i=t.col()+1;i<4;i++){
+                            Tile tN=board.tile(i,t.row());
+                            if(tN!=null&&tN.value()==t.value()){
+                                count++;
+                            }
+                        }
+
+                        if(count==0){
+                            for(int i=t.col()+1;i<4;i++){
+                                Tile ft=board.tile(i,t.row());
+                                if(ft!=null){
+                                    board.move(i-1,t.row(),t);
+                                    changed=true;
+                                    break;
+                                }else changed=false;
+                            }
+                            if(changed==false){
+                                board.move(3,t.row(),t);
+                                changed=true;
+                            }
+                        }else if(count%2==0&&count!=0){
+                            for(int i=t.col()+1;i<4;i++){
+                                Tile ft=board.tile(i,t.row());
+                                if(ft!=null) {
+                                    if(num[t.col()][t.row()]==0){
+                                        if (ft.value() == t.value()) {
+                                            int col = ft.col();
+                                            int row = ft.row();
+                                            for (int j = col + 1; j < 4; j++) {
+                                                Tile fT = board.tile(j, row);
+                                                if (fT != null) {
+                                                    if (ft.value() == fT.value()) {
+                                                        if(num[ft.col()][ft.row()]==0) {
+                                                            boolean merge = board.move(fT.col(), row, ft);
+                                                            if (merge) {
+                                                                score += 4;
+                                                                num[fT.col()][ft.row()] = 1;
+                                                            }
+                                                            changed = true;
+                                                        }
+                                                    } else {
+                                                        if(num[ft.col()][ft.row()]==0) {
+                                                            boolean merge = board.move(fT.col(), ft.row(), ft);
+                                                            changed=true;
+                                                            if (merge) {
+                                                                score += 4;
+                                                                num[fT.col()][ft.row()] = 1;
+                                                            }
+                                                        }
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                            boolean merge = board.move(col, row, t);
+                                            if (merge) {
+                                                score += 4;
+                                                num[col][row] = 1;
+                                            }
+                                            changed = true;}
+                                    }else {
+                                        if (num[t.col()][t.row()] == 0) {
+                                            boolean merge = board.move(ft.col()-1, ft.row(), t);
+                                            if (merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                            changed = true;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }else if(count%2!=0){
+                            for(int i=t.col()+1;i<4;i++){
+                                Tile ft=board.tile(i,t.row());
+                                if(ft!=null){
+                                    if(ft.value()==t.value()){
+                                        if(num[t.col()][t.row()]==0) {
+                                            boolean merge = board.move(ft.col(), ft.row(), t);
+                                            changed=true;
+                                            if (merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                        }
+                                    }else {
+                                        if(num[t.col()][t.row()]==0) {
+                                            boolean merge = board.move(ft.col()-1, ft.row(), t);
+                                            changed=true;
+                                            if(merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        if(c==3){
+                            for(int i=3;i>=0;i--){
+                                Tile tb=board.tile(i,r);
+                                if(tb!=null){
+                                    for(int j=tb.col()+1;j<4;j++){
+                                        Tile tf=board.tile(j,r);
+                                        if(tf!=null){
+                                            boolean merge=board.move(tf.col()-1,r,tb);
+                                            changed=true;
+                                            if(merge){
+                                                score+=4;
+                                                num[tf.col()][r]=1;
+                                            }
+                                        }else{
+                                            board.move(j,r,tb);
+                                            changed=true;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if(side==Side.WEST){
+            int [][] num=new int[board.size()][board.size()];
+            for (int i = 0; i < num.length; i++) {
+                for (int j = 0; j < num[i].length; j++) {
+                    num[i][j] = 0;
+                }
+            }
+
+            for(int r=3;r>=0;r--){
+                for(int c=3;c>=0;c--){
+                    Tile t=board.tile(c,r);
+                    if(t!=null){
+                        int count=0;
+                        for(int i=t.col()-1;i>=0;i--){
+                            Tile tN=board.tile(i,t.row());
+                            if(tN!=null&&tN.value()==t.value()){
+                                count++;
+                            }
+                        }
+
+                        if(count==0){
+                            for(int i=t.col()-1;i>=0;i--){
+                                Tile ft=board.tile(i,t.row());
+                                if(ft!=null){
+                                    board.move(i+1,t.row(),t);
+                                    changed=true;
+                                    break;
+                                }else changed=false;
+                            }
+                            if(changed==false){
+                                board.move(0,t.row(),t);
+                                changed=true;
+                            }
+                        }else if(count%2==0&&count!=0){
+                            for(int i=t.col()-1;i>=0;i--){
+                                Tile ft=board.tile(i,t.row());
+                                if(ft!=null) {
+                                    if(num[t.col()][t.row()]==0){
+                                        if (ft.value() == t.value()) {
+                                            int col = ft.col();
+                                            int row = ft.row();
+                                            for (int j = col - 1; j >= 0; j--) {
+                                                Tile fT = board.tile(j, row);
+                                                if (fT != null) {
+                                                    if (ft.value() == fT.value()) {
+                                                        if(num[ft.col()][ft.row()]==0) {
+                                                            boolean merge = board.move(fT.col(), row, ft);
+                                                            if (merge) {
+                                                                score += 4;
+                                                                num[fT.col()][ft.row()] = 1;
+                                                            }
+                                                            changed = true;
+                                                        }
+                                                    } else {
+                                                        if(num[ft.col()][ft.row()]==0) {
+                                                            boolean merge = board.move(fT.col(), ft.row(), ft);
+                                                            changed=true;
+                                                            if (merge) {
+                                                                score += 4;
+                                                                num[fT.col()][ft.row()] = 1;
+                                                            }
+                                                        }
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                            boolean merge = board.move(col, row, t);
+                                            if (merge) {
+                                                score += 4;
+                                                num[col][row] = 1;
+                                            }
+                                            changed = true;}
+                                    }else {
+                                        if (num[t.col()][t.row()] == 0) {
+                                            boolean merge = board.move(ft.col()+1, ft.row(), t);
+                                            if (merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                            changed = true;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }else if(count%2!=0){
+                            for(int i=t.col()-1;i>=0;i--){
+                                Tile ft=board.tile(i,t.row());
+                                if(ft!=null){
+                                    if(ft.value()==t.value()){
+                                        if(num[t.col()][t.row()]==0) {
+                                            boolean merge = board.move(ft.col(), ft.row(), t);
+                                            changed=true;
+                                            if (merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                        }
+                                    }else {
+                                        if(num[t.col()][t.row()]==0) {
+                                            boolean merge = board.move(ft.col()+1, ft.row(), t);
+                                            changed=true;
+                                            if(merge) {
+                                                score += 4;
+                                                num[ft.col()][ft.row()] = 1;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        if(c==0){
+                            for(int i=0;i<4;i++){
+                                Tile tb=board.tile(i,r);
+                                if(tb!=null){
+                                    for(int j=tb.col()-1;j>=0;j--){
+                                        Tile tf=board.tile(j,r);
+                                        if(tf!=null){
+                                            boolean merge=board.move(tf.col()+1,r,tb);
+                                            changed=true;
+                                            if(merge){
+                                                score+=4;
+                                                num[tf.col()][r]=1;
+                                            }
+                                        }else{
+                                            board.move(j,r,tb);
+                                            changed=true;
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         checkGameOver();
         if (changed) {
             setChanged();
@@ -138,6 +704,15 @@ public class Model extends Observable {
      * */
     public static boolean emptySpaceExists(Board b) {
         // TODO: Fill in this function.
+        for(int row = 0;row < b.size();row += 1){
+            for(int col = 0;col < b.size();col+=1){
+                if(b.tile(col,row)!=null){
+                    continue;
+                }else{
+                    return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -148,6 +723,15 @@ public class Model extends Observable {
      */
     public static boolean maxTileExists(Board b) {
         // TODO: Fill in this function.
+        for(int row = 0;row < b.size();row += 1){
+            for(int col = 0;col < b.size();col += 1){
+                if(!Objects.isNull(b.tile(col,row)) && b.tile(col,row).value()==MAX_PIECE){
+                    return true;
+                }else {
+                    continue;
+                }
+            }
+        }
         return false;
     }
 
@@ -159,6 +743,66 @@ public class Model extends Observable {
      */
     public static boolean atLeastOneMoveExists(Board b) {
         // TODO: Fill in this function.
+        for(int col = 0;col < b.size();col += 1){
+            for(int row = 0;row < b.size();row += 1){
+                if(b.tile(col,row)==null){
+                    return true;
+                }else if(row==0){
+                    if(col==0){
+                        if((!Objects.isNull(b.tile(col+1,row))&&(b.tile(col+1,row).value()==b.tile(col,row).value()))
+                            ||(!Objects.isNull(b.tile(col,row+1))&&(b.tile(col,row+1).value()==b.tile(col,row).value()))){
+                            return true;
+                        }
+                    }else if(col==3){
+                        if((!Objects.isNull(b.tile(col-1,row))&&(b.tile(col-1,row).value()==b.tile(col,row).value()))
+                            ||(!Objects.isNull(b.tile(col,row+1))&&(b.tile(col,row+1).value()==b.tile(col,row).value()))){
+                            return true;
+                        }
+                    }else{
+                        if((!Objects.isNull(b.tile(col-1,row))&&(b.tile(col-1,row).value()==b.tile(col,row).value()))
+                            ||(!Objects.isNull(b.tile(col+1,row))&&(b.tile(col+1,row).value()==b.tile(col,row).value()))
+                            ||(!Objects.isNull(b.tile(col,row+1))&&(b.tile(col,row+1).value()==b.tile(col,row).value()))){
+                            return true;
+                        }
+                    }
+                }else if(row==3){
+                    if(col==0){
+                        if((!Objects.isNull(b.tile(col+1,row))&&(b.tile(col+1,row).value()==b.tile(col,row).value()))
+                            ||(!Objects.isNull(b.tile(col,row-1))&&(b.tile(col,row-1).value()==b.tile(col,row).value()))){
+                            return true;
+                        }
+                    }else if(col==3){
+                        if((!Objects.isNull(b.tile(col-1,row))&&(b.tile(col-1,row).value()==b.tile(col,row).value()))
+                            ||(!Objects.isNull(b.tile(col,row-1))&&(b.tile(col,row-1).value()==b.tile(col,row).value()))){
+                            return true;
+                        }
+                    }
+                }else if(col==0){
+                    if(row==1||row==2){
+                        if((!Objects.isNull(b.tile(col,row+1))&&(b.tile(col,row+1).value()==b.tile(col,row).value()))
+                                ||(!Objects.isNull(b.tile(col,row-1))&&(b.tile(col,row-1).value()==b.tile(col,row).value()))
+                                ||(!Objects.isNull(b.tile(col+1,row))&&(b.tile(col+1,row).value()==b.tile(col,row).value()))){
+                            return true;
+                        }
+                    }
+                }else if(col==3){
+                    if(row==1||row==2){
+                        if(!Objects.isNull(b.tile(col-1,row))&&(b.tile(col-1,row).value()==b.tile(col,row).value())
+                            ||(!Objects.isNull(b.tile(col,row-1))&&(b.tile(col,row+1).value()==b.tile(col,row).value()))
+                            ||(!Objects.isNull(b.tile(col,row+1))&&(b.tile(col,row+1).value()==b.tile(col,row).value()))){
+                            return true;
+                        }
+                    }
+                }else{
+                    if((!Objects.isNull(b.tile(col-1,row))&&(b.tile(col-1,row).value()==b.tile(col,row).value()))
+                        ||(!Objects.isNull(b.tile(col+1,row))&&(b.tile(col+1,row).value()==b.tile(col,row).value()))
+                        ||(!Objects.isNull(b.tile(col,row-1))&&(b.tile(col,row-1).value()==b.tile(col,row).value()))
+                        ||(!Objects.isNull(b.tile(col,row+1))&&(b.tile(col,row+1).value()==b.tile(col,row).value()))){
+                        return true;
+                    }
+                }
+            }
+        }
         return false;
     }
 
