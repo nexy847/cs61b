@@ -1,11 +1,8 @@
 package gitlet;
 
 import java.io.File;
-import java.nio.file.Files;
 import java.io.IOException;
 import java.util.*;
-
-import static gitlet.Utils.*;
 
 // TODO: any imports you need here
 
@@ -502,8 +499,16 @@ public class Repository {
         return sb;
     }
 
-    public static void checkout(String commitID,String fileName,String branchName){
-        if()
+    public static void checkout(String commitID,String fileName,String branchName) throws IOException {
+        File file=Utils.join(CWD,fileName);
+        if(commitID==null&&fileName!=null&&branchName==null){
+            checkOutFile(file);
+        }else if(commitID!=null&&fileName!=null&&branchName==null){
+            Commit commit=findCommitByCommitID(commitID);
+            checkOutFileFromCommit(commit,file);
+        }else if(commitID==null&&fileName==null&&branchName!=null){
+            checkOutBranch(branchName);
+        }
     }
 
     private static void checkOutFile(File fileCheck) throws IOException {//获取头提交中存在的文件版本并将其放入工作目录中，覆盖已存在的文件版本（如果存在）
@@ -550,7 +555,7 @@ public class Repository {
         return null;
     }
 
-    private static File checkOutFileFromCommit(Commit commit,File fileCheckout) throws IOException {
+    private static void checkOutFileFromCommit(Commit commit,File fileCheckout) throws IOException {
         //获取具有给定 id 的提交中存在的文件版本，并将其放入工作目录中，覆盖已存在的文件版本（如果存在）
         if(commit==null) {
             System.out.println("No commit with that id exists.");
@@ -566,5 +571,81 @@ public class Repository {
             if(fileCheckout.exists()) Utils.restrictedDelete(fileCheckout);
             newFile.createNewFile();
         }
+    }
+
+    private static void checkOutBranch(String branchName) throws IOException{
+        /*获取给定分支头部提交中的所有文件，并将它们放入工作目录中，覆盖已存在的文件的版本（如果存在）。
+        此外，在此命令结束时，给定分支现在将被视为当前分支 (HEAD)。当前分支中跟踪但不存在于签出分支中的任何文件都将被删除。
+        暂存区域将被清除，除非签出的分支是当前分支
+         */
+        Commit newCommit=findCommitByBranchName(branchName);
+        checkOutBranchNotNow(newCommit);
+    }
+
+    private static void checkBeforeCheckOut(Commit commit){
+        if(Utils.readContentsAsString(HEAD).equals(commit.getID())){
+            System.out.println("No need to checkout the current branch.");
+            System.exit(0);
+        }
+        File[] files=CWD.listFiles();
+        for(File file:files){
+            if(!isTrackedByOldCommit(file)&&isDuplicatedInNewCommit(file,commit)){
+                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                System.exit(0);
+            }
+        }
+    }
+
+    private static boolean isDuplicatedInNewCommit(File file,Commit newCommit){
+        for(String path:newCommit.getPathToBlobID().keySet()){
+            if(file.getPath().equals(path)){
+                if(file.exists()){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isTrackedByOldCommit(File file){
+        Commit oldCommit=findCommitByCommitID(Utils.readContentsAsString(HEAD));
+        for(String path:oldCommit.getPathToBlobID().keySet()){
+            if(path.equals(file.getPath())){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Commit findCommitByBranchName(String branchName){
+        File[] files=HEADS.listFiles();
+        for(File file:files){
+            if(branchName.equals(file.getName())) {
+                String commitID = Utils.readContentsAsString(file);
+                return findCommitByCommitID(commitID);
+            }
+        }
+        System.out.println("No such branch exists.");
+        System.exit(0);
+        return null;
+    }
+
+    private static void checkOutBranchNotNow(Commit commit) throws IOException {
+        Map<String,String> pathToBlobID=commit.getPathToBlobID();
+        Set<String> filesPath=pathToBlobID.keySet();
+        for(String path:filesPath){
+            File file=new File(path);
+            if(file.exists() && isTrackedByOldCommit(file)){
+                Utils.restrictedDelete(file);
+            }
+            File newFile=findFileFromBlob(pathToBlobID.get(path));
+            newFile.createNewFile();
+        }
+        afterCheck(commit);
+    }
+
+    private static void afterCheck(Commit newCommit){
+        Commit oldCommit=findCommitByCommitID(Utils.readContentsAsString(HEAD));
+        Utils.writeContents(HEAD,newCommit.getID());
     }
 }
