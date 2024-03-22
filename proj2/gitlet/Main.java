@@ -45,7 +45,7 @@ public class Main {
         for(Commit commit:commitArray){
             System.out.println(commit.getID());
         }*/
-        //Repository.add(file);
+        //Repository.commit("test 1");
         Repository.checkout(null,"hello,world",null);
     }
 }

@@ -2,6 +2,7 @@ package gitlet;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 // TODO: any imports you need here
@@ -512,26 +513,31 @@ public class Repository {
     }
 
     private static void checkOutFile(File fileCheck) throws IOException {//获取头提交中存在的文件版本并将其放入工作目录中，覆盖已存在的文件版本（如果存在）
-        String headID=Utils.readContentsAsString(HEAD);
+        String headID=Utils.readContentsAsString(HEAD);//取出当前commit的id
         File[] files=OBJECTS.listFiles();
         for(File file:files){
-            if(file.getName().equals(headID)){
+            if(file.getName().equals(headID)){//找到当前包含commit对象的文件
                 Commit newCommit=Utils.readObject(file,Commit.class);
-                for(String path:newCommit.getPathToBlobID().keySet()){
-                    if(path.equals(file.getPath())){
-                        File newFile=findFileFromBlob(newCommit.getPathToBlobID().get(path));
-                        if(newFile==null){
-                            System.out.println("File does not exist in that commit.");
-                            System.exit(0);
-                        }
-                        if(fileCheck.exists()) {
-                            Utils.restrictedDelete(fileCheck);
-                        }
-                        newFile.createNewFile();
+                for(String path:newCommit.getPathToBlobID().keySet()){//遍历commit对象的键值对的键--跟踪的文件的路径
+                    Blob blob=findBlobByBlobID(newCommit.getPathToBlobID().get(path));//找到Blob文件
+                    if(blob.getFilePath().equals(fileCheck.getPath())){
+                        byte[] newContents=blob.getSaveFileBytes();
+                        String str=new String(newContents, StandardCharsets.UTF_8);
+                        Utils.writeContents(fileCheck,str);
                     }
                 }
             }
         }
+    }
+
+    private static Blob findBlobByBlobID(String BlobID){
+        File[] files=OBJECTS.listFiles();
+        for(File file:files){
+            if(file.getName().equals(BlobID)){
+                return Utils.readObject(file,Blob.class);
+            }
+        }
+        return null;
     }
 
     private static File findFileFromBlob(String BlobID){

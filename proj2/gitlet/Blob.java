@@ -11,9 +11,12 @@ public class Blob implements Serializable {
 
     private File saveFile;
 
+    private byte[] saveFileBytes;
+
     public void addFile(String filePath,File saveFile){
         this.filePath=filePath;
         this.saveFile=saveFile;
+        this.saveFileBytes=Utils.readContents(saveFile);
     }
     public String setID(){
         this.ID=Utils.sha1(Utils.serialize(saveFile));
@@ -28,6 +31,14 @@ public class Blob implements Serializable {
 
     public File getFile(){
         return this.saveFile;
+    }
+
+    public String getFilePath(){
+        return this.filePath;
+    }
+
+    public byte[] getSaveFileBytes(){
+        return this.saveFileBytes;
     }
 
 }
