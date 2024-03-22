@@ -26,4 +26,8 @@ public class Blob implements Serializable {
         Utils.writeObject(blob,this);
     }
 
+    public File getFile(){
+        return this.saveFile;
+    }
+
 }

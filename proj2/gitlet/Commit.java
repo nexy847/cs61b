@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -15,7 +16,7 @@ import java.util.*;
  *
  *  @author TODO
  */
-public class Commit implements Serializable {
+public class Commit implements Serializable,Comparable<Commit> {
     /**
      * TODO: add instance variables here.
      *
@@ -93,4 +94,25 @@ public class Commit implements Serializable {
         return this.parentID;
     }
 
+    public String getTimeStamp(){
+        return this.timeStamp;
+    }
+
+    public String getMessage(){
+        return this.message;
+    }
+
+    @Override
+    public int compareTo(Commit o) {
+        DateFormat dateFormat=new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z", Locale.US);
+        try {
+            Date thisDate=dateFormat.parse(this.timeStamp);
+            Date otherDate=dateFormat.parse(o.timeStamp);
+            //越接近当下越小
+            return thisDate.compareTo(otherDate);
+        } catch (ParseException e) {
+            e.printStackTrace();
+            return 0;
+        }
+    }
 }

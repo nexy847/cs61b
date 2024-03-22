@@ -33,9 +33,18 @@ public class Main {
         }*/
         //File file=Utils.join(Repository.CWD,"hello,wikit");
         //Repository.rm(file);
-        List<Commit> commitList=Repository.BFSCommit();
+        /*List<Commit> commitList=Repository.BFSCommit();
         for(Commit commit:commitList){
             System.out.println(commit.getID());
-        }
+        }*/
+        File file=Utils.join(Repository.CWD,"hello,world");
+        //Repository.commit("test rm and status");
+        //Repository.rm(file);
+        /*List<Commit> commitList= Repository.BFSCommit();
+        Commit[] commitArray=Repository.HeapSort(commitList);
+        for(Commit commit:commitArray){
+            System.out.println(commit.getID());
+        }*/
+        Repository.status();
     }
 }

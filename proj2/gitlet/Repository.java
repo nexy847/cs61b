@@ -334,10 +334,31 @@ public class Repository {
     }
 
     public static void log(){//图的广度遍历,后做堆排序
-
+        List<Commit> commitList=BFSCommit();
+        Commit[] commits=HeapSort(commitList);
+        gotLog(commits);
     }
 
-    public static List<Commit> BFSCommit(){//对图做广度遍历,得到一个Commit的List序列
+    private static void gotLog(Commit[] commits){
+        for(Commit commit:commits){
+            StringBuilder sb=new StringBuilder();
+            sb.append("==="+"\n");
+            sb.append("commit "+commit.getID()+"\n");
+            if(commit.getParentID().size()==1) {
+                sb.append("Date: " + commit.getTimeStamp() + "\n");
+                sb.append(commit.getMessage()+"\n");
+            }else{
+                StringBuilder first=new StringBuilder(commit.getParentID().get(0));
+                StringBuilder second=new StringBuilder(commit.getParentID().get(1));
+                sb.append("Merge: "+first.substring(0,7)+" "+second.substring(0,7));
+                sb.append("Date: "+commit.getTimeStamp());
+                sb.append(" "+"\n");
+            }
+            System.out.println(sb.toString());
+        }
+    }
+
+    private static List<Commit> BFSCommit(){//对图做广度遍历,得到一个Commit的List序列
         List<Commit> commitList=new ArrayList<>();
         String head=Utils.readContentsAsString(HEAD);
         File[] files=OBJECTS.listFiles();
@@ -349,7 +370,7 @@ public class Repository {
                 break;
             }
         }
-        List<String> parents=heads.getParentID();
+        //List<String> parents=heads.getParentID();
         Set<Commit> visited=new HashSet<>();
         visited.add(heads);
         Queue<Commit> que=new LinkedList<>();
@@ -357,6 +378,7 @@ public class Repository {
         while(!que.isEmpty()){
             Commit vet=que.poll();
             commitList.add(vet);
+            List<String> parents=vet.getParentID();
             //遍历邻接顶点
             outer:
             for(String parent:parents){
@@ -369,12 +391,180 @@ public class Repository {
                     }
                 }
             }
-            parents=vet.getParentID();
+            //parents=vet.getParentID();
         }
         return commitList;
     }
 
-    /*private static List<Commit>  HeapSort(List<Commit> commitList){
+    private static Commit[]  HeapSort(List<Commit> commitList){//堆排序
+        Commit[] commitArray=commitList.toArray(new Commit[commitList.size()]);
+        for(int i=(commitArray.length/2)-1;i>=0;i--){
+            adjustHeap(commitArray,i,commitArray.length);
+        }
+        for(int i=commitArray.length-1;i>0;i--){
+            Swap(commitArray,0,i);
+            adjustHeap(commitArray,0,i);
+        }
+        return commitArray;
+    }
 
-    }*/
+    private static void adjustHeap(Commit[] arr,int i,int length){
+        Commit temp=arr[i];
+        for(int k=2*i+1;k<length;k=k*2+1){
+            if(k+1<length&&arr[k].compareTo(arr[k+1])>0){
+                k++;
+            }
+            if(arr[k].compareTo(temp)<0){
+                arr[i]=arr[k];
+                i=k;
+            }else{
+                break;
+            }
+        }
+        arr[i]=temp;
+    }
+
+    private static void Swap(Commit[] arr,int i,int j){
+        Commit temp=arr[i];
+        arr[i]=arr[j];
+        arr[j]=temp;
+    }
+
+    public static void global_log(){
+        List<Commit> commitList=BFSCommit();
+        Commit[] commits=HeapSort(commitList);
+        for(Commit commit:commits){
+            System.out.println(commit.getMessage());
+        }
+    }
+
+    public static void find(String message){
+        List<Commit> commitList=BFSCommit();
+        Commit[] commits=HeapSort(commitList);
+        for(Commit commit:commits){
+            if(commit.getMessage().equals(message)){
+                System.out.println(commit.getID()+"\n");
+                return;
+            }
+        }
+        System.out.println("Found no commit with that message.");
+    }
+
+    public static void status(){
+        StringBuilder sb=new StringBuilder();
+        sb.append("=== Branches ==="+"\n");
+        sb.append(findBranches());
+        sb.append("=== Staged Files ==="+"\n");
+        sb.append(findAddStaged());
+        sb.append("=== Removed Files ==="+"\n");
+        sb.append(findRemoveStage());
+        System.out.println(sb.toString());
+    }
+
+    private static StringBuilder findBranches(){
+        StringBuilder sb=new StringBuilder();
+        File[] files=HEADS.listFiles();
+        String head=Utils.readContentsAsString(HEAD);
+        for(File file:files){
+            if(Utils.readContentsAsString(file).equals(head)){
+                sb.append("*"+file.getName()+"\n");
+                break;
+            }
+        }
+        for(File file:files){
+            if(Utils.readContentsAsString(file).equals(head)){
+                continue;
+            }
+            sb.append(file.getName()+"\n");
+        }
+        return sb;
+    }
+
+    private static StringBuilder findAddStaged(){
+        StringBuilder sb=new StringBuilder();
+        if(Utils.readContents(ADDSTAGE).length==0) return sb;
+        Stage addStage=Utils.readObject(ADDSTAGE,Stage.class);
+        for(String filePath:addStage.getPathToBlobID().keySet()){
+            File file=new File(filePath);
+            if(file.exists()) sb.append(file.getName()+"\n");
+        }
+        return sb;
+    }
+
+    private static StringBuilder findRemoveStage(){
+        StringBuilder sb=new StringBuilder();
+        if(Utils.readContents(REMOVESTAGE).length==0) return sb;
+        Stage removeStage=Utils.readObject(REMOVESTAGE,Stage.class);
+        for(String filePath:removeStage.getPathToBlobID().keySet()){
+            File file=new File(filePath);
+            sb.append(file.getName()+'\n');
+        }
+        return sb;
+    }
+
+    public static void checkout(String commitID,String fileName,String branchName){
+        if()
+    }
+
+    private static void checkOutFile(File fileCheck) throws IOException {//获取头提交中存在的文件版本并将其放入工作目录中，覆盖已存在的文件版本（如果存在）
+        String headID=Utils.readContentsAsString(HEAD);
+        File[] files=OBJECTS.listFiles();
+        for(File file:files){
+            if(file.getName().equals(headID)){
+                Commit newCommit=Utils.readObject(file,Commit.class);
+                for(String path:newCommit.getPathToBlobID().keySet()){
+                    if(path.equals(file.getPath())){
+                        File newFile=findFileFromBlob(newCommit.getPathToBlobID().get(path));
+                        if(newFile==null){
+                            System.out.println("File does not exist in that commit.");
+                            System.exit(0);
+                        }
+                        if(fileCheck.exists()) {
+                            Utils.restrictedDelete(fileCheck);
+                        }
+                        newFile.createNewFile();
+                    }
+                }
+            }
+        }
+    }
+
+    private static File findFileFromBlob(String BlobID){
+        File[] files=OBJECTS.listFiles();
+        for(File file:files){
+            if(file.getName().equals(BlobID)){
+                Blob blob=Utils.readObject(file,Blob.class);
+                return blob.getFile();
+            }
+        }
+        return null;
+    }
+
+    private static Commit findCommitByCommitID(String commitID){
+        File[] files=OBJECTS.listFiles();
+        for(File file:files){
+            if(file.getName().equals(commitID)){
+                return Utils.readObject(file,Commit.class);
+            }
+        }
+        return null;
+    }
+
+    private static File checkOutFileFromCommit(Commit commit,File fileCheckout) throws IOException {
+        //获取具有给定 id 的提交中存在的文件版本，并将其放入工作目录中，覆盖已存在的文件版本（如果存在）
+        if(commit==null) {
+            System.out.println("No commit with that id exists.");
+            System.exit(0);
+        }
+        Set<String> BlobIds=commit.getPathToBlobID().keySet();
+        for(String blobId:BlobIds){
+            File newFile=findFileFromBlob(blobId);
+            if(newFile==null) {
+                System.out.println("File does not exist in that commit.");
+                System.exit(0);
+            }
+            if(fileCheckout.exists()) Utils.restrictedDelete(fileCheckout);
+            newFile.createNewFile();
+        }
+    }
 }
