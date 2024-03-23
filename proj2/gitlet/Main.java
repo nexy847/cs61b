@@ -46,6 +46,7 @@ public class Main {
             System.out.println(commit.getID());
         }*/
         //Repository.commit("test 1");
-        Repository.checkout(null,"hello,world",null);
+        //Repository.checkout("ccca03a5abbaa1d8e0a08be98e1f3f54a0eab878","hello,world",null);
+        Repository.branch("hello");
     }
 }

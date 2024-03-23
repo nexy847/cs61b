@@ -567,15 +567,18 @@ public class Repository {
             System.out.println("No commit with that id exists.");
             System.exit(0);
         }
-        Set<String> BlobIds=commit.getPathToBlobID().keySet();
-        for(String blobId:BlobIds){
-            File newFile=findFileFromBlob(blobId);
-            if(newFile==null) {
-                System.out.println("File does not exist in that commit.");
-                System.exit(0);
+        File[] files=OBJECTS.listFiles();
+        for(String path:commit.getPathToBlobID().keySet()){
+            if(fileCheckout.getPath().equals(path)){//找到BlobID
+                for(File file:files){
+                    if(file.getName().equals(commit.getPathToBlobID().get(path))){
+                        Blob blob=Utils.readObject(file,Blob.class);
+                        byte[] newContents= blob.getSaveFileBytes();
+                        String str=new String(newContents,StandardCharsets.UTF_8);
+                        Utils.writeContents(fileCheckout,str);
+                    }
+                }
             }
-            if(fileCheckout.exists()) Utils.restrictedDelete(fileCheckout);
-            newFile.createNewFile();
         }
     }
 
@@ -585,33 +588,40 @@ public class Repository {
         暂存区域将被清除，除非签出的分支是当前分支
          */
         Commit newCommit=findCommitByBranchName(branchName);
-        checkOutBranchNotNow(newCommit);
+        Commit oldCommit=findCommitByCommitID(Utils.readContentsAsString(HEAD));
+        File[] CWDFiles=CWD.listFiles();
+        List<File> newFileList=new ArrayList<>();
+        for(String path:newCommit.getPathToBlobID().keySet()){
+            Blob blob=findBlobByBlobID(newCommit.getPathToBlobID().get(path));
+            newFileList.add(blob.getFile());
+        }
+        File[] newFile=newFileList.toArray(new File[newFileList.size()]);
+        iterateSituations(CWDFiles,oldCommit,newCommit);
+        iterateSituations(newFile,oldCommit,newCommit);
     }
 
-    private static void checkBeforeCheckOut(Commit commit){
-        if(Utils.readContentsAsString(HEAD).equals(commit.getID())){
-            System.out.println("No need to checkout the current branch.");
-            System.exit(0);
-        }
-        File[] files=CWD.listFiles();
+    private static void iterateSituations(File[] files,Commit oldCommit,Commit newCommit) throws IOException {
         for(File file:files){
-            if(!isTrackedByOldCommit(file)&&isDuplicatedInNewCommit(file,commit)){
-                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-                System.exit(0);
+            if(isTrackedByNewCommit(file,newCommit)&&isTrackedByOldCommit(file)){
+                TrackedBothOf(file,newCommit);
+            }else if(!isTrackedByOldCommit(file)&&isTrackedByNewCommit(file,newCommit)){
+                TrackedByNewNoOld(file,newCommit);
+            }else if(isTrackedByOldCommit(file)&&!isTrackedByNewCommit(file,newCommit)){
+                TrackedByOldNotNew(file);
             }
         }
+        afterCheck(newCommit);
     }
 
-    private static boolean isDuplicatedInNewCommit(File file,Commit newCommit){
+    private static boolean isTrackedByNewCommit(File file,Commit newCommit){
         for(String path:newCommit.getPathToBlobID().keySet()){
-            if(file.getPath().equals(path)){
-                if(file.exists()){
-                    return true;
-                }
+            if(path.equals(file.getPath())){
+                return true;
             }
         }
         return false;
     }
+
 
     private static boolean isTrackedByOldCommit(File file){
         Commit oldCommit=findCommitByCommitID(Utils.readContentsAsString(HEAD));
@@ -622,6 +632,35 @@ public class Repository {
         }
         return false;
     }
+
+    private static void TrackedBothOf(File file,Commit newCommit){//文件被两者跟踪
+        //byte[] newContents=Utils.readContents(file);
+        for(String path:newCommit.getPathToBlobID().keySet()) {
+            if (path.equals(file.getPath())) {
+                Blob blob = findBlobByBlobID(newCommit.getPathToBlobID().get(path));
+                byte[] newContents = blob.getSaveFileBytes();
+                String str=new String(newContents,StandardCharsets.UTF_8);
+                Utils.writeContents(file,str);
+            }
+        }
+    }
+
+    private static void TrackedByOldNotNew(File file){//被旧分支追踪但不被新分支追踪
+        Utils.restrictedDelete(file);
+    }
+
+    private static void TrackedByNewNoOld(File file,Commit newCommit) throws IOException {
+        for(String path:newCommit.getPathToBlobID().keySet()){
+            if(path.equals(file.getPath())){
+                Blob blob=findBlobByBlobID(newCommit.getPathToBlobID().get(path));
+                byte[] newContents= blob.getSaveFileBytes();
+                String str=new String(newContents,StandardCharsets.UTF_8);
+                Utils.writeContents(file,str);
+            }
+        }
+    }
+
+    //---------------------------------------------------------------------------------------------------
 
     private static Commit findCommitByBranchName(String branchName){
         File[] files=HEADS.listFiles();
@@ -636,22 +675,21 @@ public class Repository {
         return null;
     }
 
-    private static void checkOutBranchNotNow(Commit commit) throws IOException {
-        Map<String,String> pathToBlobID=commit.getPathToBlobID();
-        Set<String> filesPath=pathToBlobID.keySet();
-        for(String path:filesPath){
-            File file=new File(path);
-            if(file.exists() && isTrackedByOldCommit(file)){
-                Utils.restrictedDelete(file);
-            }
-            File newFile=findFileFromBlob(pathToBlobID.get(path));
-            newFile.createNewFile();
-        }
-        afterCheck(commit);
-    }
-
     private static void afterCheck(Commit newCommit){
         Commit oldCommit=findCommitByCommitID(Utils.readContentsAsString(HEAD));
         Utils.writeContents(HEAD,newCommit.getID());
+    }
+
+    public static void branch(String branchName) throws IOException {
+        for(File file:HEADS.listFiles()){
+            if(file.getName().equals(branchName)){
+                System.out.println("A branch with that name already exists.");
+                System.exit(0);
+            }
+        }
+        File file=Utils.join(HEADS,branchName);
+        file.createNewFile();
+        String Head=Utils.readContentsAsString(HEAD);
+        Utils.writeContents(file,Head);
     }
 }
