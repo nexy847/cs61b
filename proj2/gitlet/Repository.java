@@ -154,7 +154,7 @@ public class Repository {
         newCommit.saveCommit();
         emptyAddStage();
         String current=findCurrentBranch().toString();
-        File currentBranch=Utils.join(HEADS,current);//多分支时出bug
+        File currentBranch=Utils.join(HEADS,current);
         Utils.writeContents(currentBranch,newCommit.getID());
         Utils.writeContents(HEAD,newCommit.getID());
     }
@@ -609,7 +609,7 @@ public class Repository {
         return null;
     }
 
-    private static Commit findCommitByCommitID(String commitID){
+    public static Commit findCommitByCommitID(String commitID){//私有方法
         File[] files=OBJECTS.listFiles();
         for(File file:files){
             if(file.getName().equals(commitID)){
@@ -908,6 +908,7 @@ public class Repository {
         }
         newCommit.setFileName(fileNames);
         newCommit.setPathToBlobID(pathToBlobID);
+        newCommit.setID();
         newCommit.saveCommit();
         String newBranch=findCurrentBranch().toString();
         for(File file:HEADS.listFiles()){
@@ -915,6 +916,7 @@ public class Repository {
                 Utils.writeContents(file,newCommit.getID());
             }
         }
+        Utils.writeContents(HEAD,newCommit.getID());
     }
 
     private static void verifyBeforeMerge(Commit currentCommit,String branchName){
@@ -945,12 +947,12 @@ public class Repository {
                 for(String path:currentComit.getPathToBlobID().keySet()){
                     Blob blob=findBlobByBlobID(currentComit.getPathToBlobID().get(path));
                     if(file.getPath().equals(blob.getFilePath())){
-                        return true;
+                        return false;
                     }
                 }
             }
         }
-        return false;
+        return true;
     }
 
     private static List<File> findAllFiles(Commit splitPoint,Commit givenCommit,Commit currentCommit){
@@ -973,7 +975,17 @@ public class Repository {
             Blob blob=findBlobByBlobID(blobID);
             fileList.add(blob.getFile());
         }
-        return fileList;
+        List<File> newFileList=new ArrayList<>();
+        outer:
+        for(File file:fileList){
+            for(File file1:newFileList){
+                if(file.getPath().equals(file1.getPath())){
+                    continue outer;
+                }
+            }
+            newFileList.add(file);
+        }
+        return newFileList;
     }
 
     public static Commit findSplitPoint(Commit currentCommit,Commit givenCommit){
@@ -1053,13 +1065,13 @@ public class Repository {
         return false;
     }
 
-    private static boolean isModifiedByCurrent(Commit splitPoint,Commit currentComit,File file){
+    public static boolean isModifiedByCurrent(Commit splitPoint,Commit currentComit,File file){//私有方法
         Set<String> splitPaths=splitPoint.getPathToBlobID().keySet();
         Set<String> currentPaths=currentComit.getPathToBlobID().keySet();
         return judgeByModified(splitPaths,currentPaths,splitPoint,currentComit,file);
     }
 
-    private static boolean isModifiedByGiven(Commit splitPoint,Commit givenCommit,File file){
+    public static boolean isModifiedByGiven(Commit splitPoint,Commit givenCommit,File file){//私有方法
         Set<String> splitPaths=splitPoint.getPathToBlobID().keySet();
         Set<String> givenPaths=givenCommit.getPathToBlobID().keySet();
         return judgeByModified(splitPaths,givenPaths,splitPoint,givenCommit,file);
@@ -1074,7 +1086,8 @@ public class Repository {
                 Blob Blob=findBlobByBlobID(BlobID);
                 if(Blob.getFilePath().equals(splitBlob.getFilePath())){
                     if(file.getPath().equals(Blob.getFilePath())){//找到current和splitPoint中的Blob,且对应于file
-                        if(!Blob.getSaveFileBytes().equals(splitBlob.getSaveFileBytes())){
+                        System.out.println("bijiao"+Arrays.equals(Blob.getSaveFileBytes(),splitBlob.getSaveFileBytes()));
+                        if(!Arrays.equals(Blob.getSaveFileBytes(),splitBlob.getSaveFileBytes())){
                             return true;
                         }
                     }
