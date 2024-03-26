@@ -19,7 +19,7 @@ public class Blob implements Serializable {
         this.saveFileBytes=Utils.readContents(saveFile);
     }
     public String setID(){
-        this.ID=Utils.sha1(Utils.serialize(saveFile));
+        this.ID=Utils.sha1(Utils.readContents(saveFile));
         return this.ID;
     }
 
@@ -39,6 +39,10 @@ public class Blob implements Serializable {
 
     public byte[] getSaveFileBytes(){
         return this.saveFileBytes;
+    }
+
+    public String getID(){
+        return this.ID;
     }
 
 }

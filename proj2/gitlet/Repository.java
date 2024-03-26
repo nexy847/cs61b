@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 // TODO: any imports you need here
 
@@ -94,7 +95,7 @@ public class Repository {
             if(blobFile.getName().equals(Utils.readContentsAsString(HEAD))){
                 Commit commit=Utils.readObject(blobFile,Commit.class);
                 //判断以文件本身的哈希为值的映射是否存在
-                if(commit.getPathToBlobID().containsValue(Utils.sha1(Utils.serialize(file)))){
+                if(commit.getPathToBlobID().containsValue(Utils.sha1(Utils.readContents(file)))){
                     return true;
                 }
             }
@@ -110,7 +111,7 @@ public class Repository {
         //File removeStageFile=Utils.join(GITLET_DIR,"removeStage");
         Stage removeStage=Utils.readObject(REMOVESTAGE,Stage.class);
         Map<String,String> pathToBlobID=removeStage.getPathToBlobID();
-        if(pathToBlobID.containsValue(Utils.sha1(Utils.serialize(file)))){
+        if(pathToBlobID.containsValue(Utils.sha1(Utils.readContents(file)))){
             return true;
         }
         return false;
@@ -119,7 +120,7 @@ public class Repository {
     private static void addFile(File file) throws IOException {
         Stage stage=new Stage();
         //file=>File file=Utils.join(WORKINGCOPY,file.getName);
-        stage.addFile(file.getPath(),Utils.sha1(Utils.serialize(file)));
+        stage.addFile(file.getPath(),Utils.sha1(Utils.readContents(file)));
         stage.saveAddFile();
         Blob blob=new Blob();
         blob.addFile(file.getPath(),file);
@@ -151,10 +152,26 @@ public class Repository {
         newCommit.setFileName(findFileName(newPathToBlobID));
         newCommit.setID();
         newCommit.saveCommit();
-        Utils.writeContents(HEAD,newCommit.getID());
         emptyAddStage();
-        File master=Utils.join(HEADS,"master");
-        Utils.writeContents(master,newCommit.getID());
+        String current=findCurrentBranch().toString();
+        File currentBranch=Utils.join(HEADS,current);//多分支时出bug
+        Utils.writeContents(currentBranch,newCommit.getID());
+        Utils.writeContents(HEAD,newCommit.getID());
+    }
+
+    private static StringBuilder findCurrentBranch(){
+        StringBuilder sb=new StringBuilder();
+        File[] files=HEADS.listFiles();
+        String head=Utils.readContentsAsString(HEAD);
+        String heads=new String();
+        for(File file:files){
+            if(Utils.readContentsAsString(file).equals(head)){
+                heads=file.getName();
+                sb.append(file.getName());
+                break;
+            }
+        }
+        return sb;
     }
 
     private static boolean isAnyFileInAddStage(){
@@ -269,7 +286,7 @@ public class Repository {
                     Commit commit=Utils.readObject(fileCommit,Commit.class);
                     Set<String> keys=commit.getPathToBlobID().keySet();
                     for(String key:keys){
-                        if(key.equals(Utils.sha1(Utils.serialize(file)))){
+                        if(key.equals(Utils.sha1(Utils.readContents(file)))){
                             Stage removeStage=new Stage();
                             removeStage.addRemoveFile(key,commit.getPathToBlobID().get(key));
                             Utils.writeObject(REMOVESTAGE,removeStage);
@@ -360,19 +377,15 @@ public class Repository {
         List<Commit> commitList=new ArrayList<>();
         String head=Utils.readContentsAsString(HEAD);
         File[] files=OBJECTS.listFiles();
-        Commit heads=new Commit("nima");
-        for(File file:files){
-            if(file.getName().equals(Utils.readContentsAsString(HEAD))){
-                Commit headf=Utils.readObject(file,Commit.class);
-                heads=headf;
-                break;
-            }
-        }
-        //List<String> parents=heads.getParentID();
-        Set<Commit> visited=new HashSet<>();
-        visited.add(heads);
         Queue<Commit> que=new LinkedList<>();
-        que.offer(heads);
+        Set<Commit> visited=new HashSet<>();
+        File[] filesBranch=HEADS.listFiles();
+        for(File file:filesBranch){
+            String branchCommitID=Utils.readContentsAsString(file);
+            Commit branchCommit=findCommitByCommitID(branchCommitID);
+            que.offer(branchCommit);
+            visited.add(branchCommit);
+        }
         while(!que.isEmpty()){
             Commit vet=que.poll();
             commitList.add(vet);
@@ -383,7 +396,13 @@ public class Repository {
                 for(File file:files){
                     if(file.getName().equals(parent)){
                         Commit commit=Utils.readObject(file,Commit.class);
-                        if(visited.contains(commit)) continue outer;
+                        Iterator<Commit> iterator= visited.iterator();
+                        while(iterator.hasNext()){
+                            Commit commit1=iterator.next();
+                            if(commit1.getID().equals(commit.getID())){
+                                continue outer;
+                            }
+                        }
                         que.offer(commit);
                         visited.add(commit);
                     }
@@ -463,14 +482,16 @@ public class Repository {
         StringBuilder sb=new StringBuilder();
         File[] files=HEADS.listFiles();
         String head=Utils.readContentsAsString(HEAD);
+        String heads=new String();
         for(File file:files){
             if(Utils.readContentsAsString(file).equals(head)){
+                heads=file.getName();
                 sb.append("*"+file.getName()+"\n");
                 break;
             }
         }
         for(File file:files){
-            if(Utils.readContentsAsString(file).equals(head)){
+            if(file.getName().equals(heads)){
                 continue;
             }
             sb.append(file.getName()+"\n");
@@ -501,15 +522,52 @@ public class Repository {
     }
 
     public static void checkout(String commitID,String fileName,String branchName) throws IOException {
-        File file=Utils.join(CWD,fileName);
         if(commitID==null&&fileName!=null&&branchName==null){
+            File file=Utils.join(CWD,fileName);
+            if(isDuplicatedCommit(file)){
+                System.out.println("File does not exist in that commit.");
+                System.exit(0);
+            }
             checkOutFile(file);
         }else if(commitID!=null&&fileName!=null&&branchName==null){
+            File file=Utils.join(CWD,fileName);
+            if(!isCommitExists(commitID)){
+                System.out.println("No commit with that id exists.");
+            }
             Commit commit=findCommitByCommitID(commitID);
+            if(isDuplicatedInSpecificCommit(file,commit)){
+                System.out.println("File does not exist in that commit.");
+                System.exit(0);
+            }
             checkOutFileFromCommit(commit,file);
         }else if(commitID==null&&fileName==null&&branchName!=null){
+            if(!isBranchExists(branchName)){
+                System.out.println("No such branch exists.");
+                System.exit(0);
+            }
+            if(branchName.equals(findCurrentBranch())){
+                System.out.println("No need to checkout the current branch.");
+                System.exit(0);
+            }
             checkOutBranch(branchName);
         }
+    }
+
+    private static boolean isCommitExists(String commitID){
+        File[] files=OBJECTS.listFiles();
+        for(File file:files){
+            if(file.getName().equals(commitID)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isDuplicatedInSpecificCommit(File file,Commit commit){
+        for(String filePath:commit.getPathToBlobID().keySet()){
+            if(file.getPath().equals(filePath)) return true;
+        }
+        return false;
     }
 
     private static void checkOutFile(File fileCheck) throws IOException {//获取头提交中存在的文件版本并将其放入工作目录中，覆盖已存在的文件版本（如果存在）
@@ -605,12 +663,26 @@ public class Repository {
             if(isTrackedByNewCommit(file,newCommit)&&isTrackedByOldCommit(file)){
                 TrackedBothOf(file,newCommit);
             }else if(!isTrackedByOldCommit(file)&&isTrackedByNewCommit(file,newCommit)){
+                //newCommit追踪的文件,工作区的文件,如果同名,则报错并退出
+                if(isDuplicatedInSpecificCommit(file,newCommit)&&isFileInCWD(file)){
+                    System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                    System.exit(0);
+                }
                 TrackedByNewNoOld(file,newCommit);
             }else if(isTrackedByOldCommit(file)&&!isTrackedByNewCommit(file,newCommit)){
                 TrackedByOldNotNew(file);
             }
         }
         afterCheck(newCommit);
+    }
+
+    private static boolean isFileInCWD(File file){
+        for(File file1:CWD.listFiles()){
+            if(file.getName().equals(file1.getName())){
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isTrackedByNewCommit(File file,Commit newCommit){
@@ -662,7 +734,7 @@ public class Repository {
 
     //---------------------------------------------------------------------------------------------------
 
-    private static Commit findCommitByBranchName(String branchName){
+    private static Commit findCommitByBranchName(String branchName){//这个branch的最新commit
         File[] files=HEADS.listFiles();
         for(File file:files){
             if(branchName.equals(file.getName())) {
@@ -691,5 +763,324 @@ public class Repository {
         file.createNewFile();
         String Head=Utils.readContentsAsString(HEAD);
         Utils.writeContents(file,Head);
+    }
+
+    public static void rm_branch(String branchName){
+        if(branchName.equals(findCurrentBranch())){
+            System.out.println("Cannot remove the current branch.");
+            System.exit(0);
+        }
+        if(!isBranchExists(branchName)){
+            System.out.println("A branch with that name does not exist.");
+            System.exit(0);
+        }
+        File branchFile=findBranchFile(branchName);
+        branchFile.delete();
+    }
+
+    private static boolean isBranchExists(String branchName){
+        File[] files=HEADS.listFiles();
+        for(File file:files){
+            if(file.getName().equals(branchName)){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static File findBranchFile(String branchName){
+        File[] files=HEADS.listFiles();
+        for(File file:files){
+            if(file.getName().equals(branchName)){
+                return file;
+            }
+        }
+        return null;
+    }
+
+    public static void reset(String commitID) throws IOException {//改变HEAD为指定commit,并将暂存区和工作目录和指定commit的内容保持不变
+        if(isCommitExists(commitID)){
+            System.out.println("No commit with that id exists.");
+            System.exit(0);
+        }
+        Commit newCommit=findCommitByCommitID(commitID);
+        Commit oldCommit=findCommitByCommitID(Utils.readContentsAsString(HEAD));
+        File[] CWDFiles=CWD.listFiles();
+        List<File> newFileList=new ArrayList<>();
+        for(String path:newCommit.getPathToBlobID().keySet()){
+            Blob blob=findBlobByBlobID(newCommit.getPathToBlobID().get(path));
+            newFileList.add(blob.getFile());
+        }
+        File[] newFile=newFileList.toArray(new File[newFileList.size()]);
+        iterateSituations(CWDFiles,oldCommit,newCommit);
+        iterateSituations(newFile,oldCommit,newCommit);
+        afterCheck(newCommit);
+    }
+
+    public static void merge(String branchName) throws IOException {//找到spilt point
+        Commit givenCommit=findCommitByBranchName(branchName);
+        Commit currentCommit=findCommitByCommitID(Utils.readContentsAsString(HEAD));
+        Commit splitPoint=findSplitPoint(currentCommit,givenCommit);
+        verifyBeforeMerge(currentCommit,branchName);
+        List<File> fileList=findAllFiles(splitPoint,givenCommit,currentCommit);
+
+        Commit newCommit=new Commit("merge commit");
+        List<String> parentID=new ArrayList<>();
+        parentID.add(currentCommit.getID());
+        parentID.add(givenCommit.getID());
+        newCommit.setParentID(parentID);
+        newCommit.setTimeStamp(parentID.get(0));
+        List<String> fileNames=new ArrayList<>();
+        Map<String,String> pathToBlobID=new HashMap<>();
+        for(File file:fileList){
+            if(isOnSplitPoint(splitPoint,file)){//存在于split point
+                if((isOnCurrent(currentCommit,file)&&isOnGiven(givenCommit,file))){//同时存在于given/current
+                    //确保不会引起冲突的条件判断;
+                    if((isModifiedByCurrent(splitPoint,currentCommit,file)&&!isModifiedByGiven(splitPoint,givenCommit,file))
+                            ||(isTheSameOnCurrentAndGiven(currentCommit,givenCommit,file))){//在current中改动或两者改动相同,工作区不做改动
+                        fileNames.add(file.getName());
+                        pathToBlobID.put(file.getPath(),currentCommit.getPathToBlobID().get(file.getPath()));
+                        continue;
+                    }
+                    if(!isOnCurrent(currentCommit,file)&&!isOnGiven(givenCommit,file)) {
+                        continue;
+                    }//同时不存在于两者之间,工作区不做改动
+                    if((!isModifiedByCurrent(splitPoint,currentCommit,file)&&
+                            isModifiedByGiven(splitPoint,givenCommit,file))){//given有修改但current没有
+                        if(isInCWDAndNotTrackedByCurrent(file,currentCommit)){
+                            System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                            System.exit(0);
+                        }
+                        //对工作区文件做改动,替换成givenCommit的文件
+                        byte[] newContents=findFileBytesFromCommit(givenCommit,file);
+                        String str=new String(newContents,StandardCharsets.UTF_8);
+                        Utils.writeContents(file,str);
+                        fileNames.add(file.getName());
+                        pathToBlobID.put(file.getPath(),givenCommit.getPathToBlobID().get(file.getPath()));
+                    }
+                    //其中包含一个冲突判断,需处理
+                    if(isModifiedByGiven(splitPoint,givenCommit,file)&&isModifiedByCurrent(splitPoint,currentCommit,file)){
+                        //对当前的文件作一个合的并
+                        byte[] currentBytes=findFileBytesFromCommit(currentCommit,file);
+                        String strCurrent=new String(currentBytes);
+                        byte[] givenBytes=findFileBytesFromCommit(givenCommit,file);
+                        String strGiven=new String(givenBytes);
+                        StringBuilder sb=new StringBuilder();
+                        sb.append("<<<<<<< ");
+                        sb.append("HEAD"+"\n");
+                        sb.append(strCurrent+"\n");
+                        sb.append("======="+"\n");
+                        sb.append(strGiven+"\n");
+                        sb.append(">>>>>>>");
+                        Utils.writeContents(file,sb.toString());
+
+                        fileNames.add(file.getName());
+                        Blob blob=new Blob();
+                        blob.addFile(file.getPath(),file);
+                        String id=blob.setID();
+                        blob.saveFile();
+                        pathToBlobID.put(file.getPath(),id);
+                    }
+                }else if(!isOnGiven(givenCommit,file)&&isOnCurrent(currentCommit,file)){//在当前分支中存在,给定中不存在
+                    if(!isModifiedByCurrent(splitPoint,currentCommit,file)){
+                        if(isInCWDAndNotTrackedByCurrent(file,currentCommit)){
+                            System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                            System.exit(0);
+                        }
+                        //删除工作区的文件(无需加到新commit中)
+                        Utils.restrictedDelete(file);
+                    }
+                }else if(isOnGiven(givenCommit,file)&&!isOnCurrent(currentCommit,file)){//在给定分支中,不在当前分支中
+                    if(!isModifiedByGiven(splitPoint,givenCommit,file)){//在given中无修改
+                        continue;//保持文件的不存在
+                    }
+                }
+            }else if(!isOnSplitPoint(splitPoint,file)){//不在分支点上
+                if(isOnCurrent(currentCommit,file)&&!isOnGiven(givenCommit,file)){//在current中,不在given中,不对工作区文件作操作
+                    fileNames.add(file.getName());
+                    pathToBlobID.put(file.getPath(),currentCommit.getPathToBlobID().get(file.getPath()));
+                    continue;
+                }else if(!isOnCurrent(currentCommit,file)&&isOnGiven(givenCommit,file)){//在given中,不在current中,
+                    //checked out and staged 没懂
+                    add(file);
+                }
+            }
+        }
+        newCommit.setFileName(fileNames);
+        newCommit.setPathToBlobID(pathToBlobID);
+        newCommit.saveCommit();
+        String newBranch=findCurrentBranch().toString();
+        for(File file:HEADS.listFiles()){
+            if(file.getName().equals(newBranch)){
+                Utils.writeContents(file,newCommit.getID());
+            }
+        }
+    }
+
+    private static void verifyBeforeMerge(Commit currentCommit,String branchName){
+        boolean check=true;
+        for(File file:HEADS.listFiles()){
+            if(file.getName().equals(branchName)){
+                check=true;
+            }
+        }
+        if(check==false){
+            System.out.println("A branch with that name does not exist.");
+            System.exit(0);
+        }
+        Commit givenCommit=findCommitByBranchName(branchName);
+        if(Utils.readContents(ADDSTAGE).length!=0||Utils.readContents(REMOVESTAGE).length!=0){
+            System.out.println("You have uncommitted changes.");
+            System.exit(0);
+        }
+        if(currentCommit.getID().equals(givenCommit.getID())){
+            System.out.println("Cannot merge a branch with itself.");
+            System.exit(0);
+        }
+    }
+
+    private static boolean isInCWDAndNotTrackedByCurrent(File file,Commit currentComit){//是否在工作区而且被当前提交跟踪
+        for(File fileCWD:CWD.listFiles()){
+            if(file.getName().equals(fileCWD.getName())){
+                for(String path:currentComit.getPathToBlobID().keySet()){
+                    Blob blob=findBlobByBlobID(currentComit.getPathToBlobID().get(path));
+                    if(file.getPath().equals(blob.getFilePath())){
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static List<File> findAllFiles(Commit splitPoint,Commit givenCommit,Commit currentCommit){
+        List<File> fileList=new ArrayList<>();
+        Set<String> givenPaths=givenCommit.getPathToBlobID().keySet();
+        Set<String> currentPaths=currentCommit.getPathToBlobID().keySet();
+        Set<String> splitPaths=splitPoint.getPathToBlobID().keySet();
+        for(String givenPath:givenPaths){
+            String blobID=givenCommit.getPathToBlobID().get(givenPath);
+            Blob blob=findBlobByBlobID(blobID);
+            fileList.add(blob.getFile());
+        }
+        for(String currenPath:currentPaths){
+            String blobID=currentCommit.getPathToBlobID().get(currenPath);
+            Blob blob=findBlobByBlobID(blobID);
+            fileList.add(blob.getFile());
+        }
+        for(String splitPath:splitPaths){
+            String blobID=splitPoint.getPathToBlobID().get(splitPath);
+            Blob blob=findBlobByBlobID(blobID);
+            fileList.add(blob.getFile());
+        }
+        return fileList;
+    }
+
+    public static Commit findSplitPoint(Commit currentCommit,Commit givenCommit){
+        Commit currentCommitAncestor=findCommitByCommitID(currentCommit.getID());
+        Commit givenCommitAncestor=findCommitByCommitID(givenCommit.getID());
+        File[] files=OBJECTS.listFiles();
+        while(!currentCommitAncestor.getID().equals(givenCommitAncestor.getID())){
+            for(File file:files){
+                String currentParentID= currentCommitAncestor.getParentID().get(0);
+                if(currentParentID.equals(file.getName())){
+                    currentCommitAncestor=findCommitByCommitID(file.getName());
+                }
+                String givenParentID=givenCommitAncestor.getParentID().get(0);
+                if(givenParentID.equals(file.getName())){
+                    givenCommitAncestor=findCommitByCommitID(file.getName());
+                }
+            }
+        }
+        return currentCommitAncestor;
+    }
+
+    private static byte[] findFileBytesFromCommit(Commit commit,File file){
+        Set<String> commitPaths=commit.getPathToBlobID().keySet();
+        for(String commitPath:commitPaths){
+            if(file.getPath().equals(commitPath)){
+                Blob blob=findBlobByBlobID(commit.getPathToBlobID().get(commitPath));
+                return blob.getSaveFileBytes();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isTheSameOnCurrentAndGiven(Commit currentCommit,Commit givenCommit,File file){
+        Set<String> currentPaths=currentCommit.getPathToBlobID().keySet();
+        Set<String> givenPaths=givenCommit.getPathToBlobID().keySet();
+        for(String currentPath:currentPaths){
+            String currentBiobID=currentCommit.getPathToBlobID().get(currentPath);
+            Blob currentBlob=findBlobByBlobID(currentBiobID);
+            for(String givenPath:givenPaths){
+                String givenBlobID=givenCommit.getPathToBlobID().get(givenPath);
+                Blob givenBlob=findBlobByBlobID(givenBlobID);
+                if(currentBlob.getFilePath().equals(givenBlob.getFilePath())){
+                    if(file.getPath().equals(currentBlob.getFilePath())){
+                        if(currentBlob.getSaveFileBytes().equals(givenBlob.getSaveFileBytes())){
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isOnSplitPoint(Commit splitPoint,File file){//文件是否存在于分割点
+        Set<String> paths=splitPoint.getPathToBlobID().keySet();
+        return judegeOnCommit(paths,file,splitPoint);
+    }
+
+    private static boolean isOnCurrent(Commit currentCommit,File file){//文件是否存在于当前分支
+        Set<String> paths=currentCommit.getPathToBlobID().keySet();
+        return judegeOnCommit(paths,file,currentCommit);
+    }
+
+    private static boolean isOnGiven(Commit givenCommit,File file){////文件是否存在于给定分支
+        Set<String> paths=givenCommit.getPathToBlobID().keySet();
+        return judegeOnCommit(paths,file,givenCommit);
+    }
+
+    private static boolean judegeOnCommit(Set<String> paths,File file,Commit commit){
+        for(String path:paths){
+            String blobID=commit.getPathToBlobID().get(path);
+            Blob blob=findBlobByBlobID(blobID);
+            if(file.getPath().equals(blob.getFilePath())){
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isModifiedByCurrent(Commit splitPoint,Commit currentComit,File file){
+        Set<String> splitPaths=splitPoint.getPathToBlobID().keySet();
+        Set<String> currentPaths=currentComit.getPathToBlobID().keySet();
+        return judgeByModified(splitPaths,currentPaths,splitPoint,currentComit,file);
+    }
+
+    private static boolean isModifiedByGiven(Commit splitPoint,Commit givenCommit,File file){
+        Set<String> splitPaths=splitPoint.getPathToBlobID().keySet();
+        Set<String> givenPaths=givenCommit.getPathToBlobID().keySet();
+        return judgeByModified(splitPaths,givenPaths,splitPoint,givenCommit,file);
+    }
+
+    private static boolean judgeByModified(Set<String> splitPaths,Set<String> commitPaths,Commit splitPoint,Commit commit,File file){
+        for(String splitPath:splitPaths){
+            String splitBlobID=splitPoint.getPathToBlobID().get(splitPath);
+            Blob splitBlob=findBlobByBlobID(splitBlobID);
+            for(String commitPath:commitPaths){
+                String BlobID=commit.getPathToBlobID().get(commitPath);
+                Blob Blob=findBlobByBlobID(BlobID);
+                if(Blob.getFilePath().equals(splitBlob.getFilePath())){
+                    if(file.getPath().equals(Blob.getFilePath())){//找到current和splitPoint中的Blob,且对应于file
+                        if(!Blob.getSaveFileBytes().equals(splitBlob.getSaveFileBytes())){
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

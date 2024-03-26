@@ -38,6 +38,7 @@ public class Main {
             System.out.println(commit.getID());
         }*/
         File file=Utils.join(Repository.CWD,"hello,world");
+        File file1=Utils.join(Repository.CWD,"branchHello");
         //Repository.commit("test rm and status");
         //Repository.rm(file);
         /*List<Commit> commitList= Repository.BFSCommit();
@@ -45,8 +46,12 @@ public class Main {
         for(Commit commit:commitArray){
             System.out.println(commit.getID());
         }*/
-        //Repository.commit("test 1");
-        //Repository.checkout("ccca03a5abbaa1d8e0a08be98e1f3f54a0eab878","hello,world",null);
-        Repository.branch("hello");
+        //Repository.commit("branch master commit");
+        //Utils.writeContents(Repository.HEAD,Utils.readContentsAsString(Utils.join(Repository.HEADS,"master")));
+        //Repository.checkout(null,null,"hello");
+        //Repository.log();
+        //Repository.status();
+        Repository.merge("master");
+        //Repository.branch("hello");
     }
 }
